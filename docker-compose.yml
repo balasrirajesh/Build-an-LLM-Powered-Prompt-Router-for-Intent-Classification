@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  router:
+    build: .
+    container_name: prompt-router
+    env_file:
+      - .env
+    volumes:
+      # Mount the current directory to enable syncing of route_log.jsonl
+      - .:/app
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
