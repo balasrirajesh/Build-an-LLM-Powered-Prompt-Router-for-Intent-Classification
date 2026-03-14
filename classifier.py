@@ -4,7 +4,7 @@ classifier.py
 Provides classify_intent(message) — the first step in the routing pipeline.
 
 The function:
-  1. Calls Gemini with the short CLASSIFIER_PROMPT to detect intent.
+  1. Calls OpenRouter with the short CLASSIFIER_PROMPT to detect intent.
   2. Parses the JSON response.
   3. Applies a confidence threshold (< 0.7 → "unclear").
   4. On ANY error (network, JSON parse, unexpected schema) returns a safe
@@ -15,7 +15,7 @@ import json
 import os
 import re
 
-import google.generativeai as genai
+from openai import OpenAI
 from dotenv import load_dotenv
 
 from prompts import CLASSIFIER_PROMPT, VALID_INTENTS
@@ -24,9 +24,14 @@ from prompts import CLASSIFIER_PROMPT, VALID_INTENTS
 # Configuration
 # ---------------------------------------------------------------------------
 load_dotenv()
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-_CLASSIFIER_MODEL = "gemini-2.0-flash"
+# Initialize the OpenAI client for OpenRouter
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.environ.get("OPENROUTER_API_KEY", "")
+)
+
+_CLASSIFIER_MODEL = "google/gemini-2.0-flash-exp:free"
 _CONFIDENCE_THRESHOLD = 0.7   # below this → treat as "unclear"
 
 _FALLBACK = {"intent": "unclear", "confidence": 0.0}
@@ -69,19 +74,17 @@ def classify_intent(message: str) -> dict:
     are caught and the function returns _FALLBACK instead of raising.
     """
     try:
-        model = genai.GenerativeModel(
-            model_name=_CLASSIFIER_MODEL,
-            system_instruction=CLASSIFIER_PROMPT,
-        )
-        response = model.generate_content(
-            message,
-            generation_config=genai.GenerationConfig(
-                temperature=0.0,           # deterministic classification
-                max_output_tokens=64,      # JSON is tiny — keep it cheap
-            ),
+        completion = client.chat.completions.create(
+            model=_CLASSIFIER_MODEL,
+            messages=[
+                {"role": "system", "content": CLASSIFIER_PROMPT},
+                {"role": "user", "content": message}
+            ],
+            temperature=0.0,
+            max_tokens=64,
         )
 
-        raw = response.text.strip()
+        raw = completion.choices[0].message.content.strip()
 
         # --- Parse JSON ---------------------------------------------------
         json_str = _extract_json(raw)

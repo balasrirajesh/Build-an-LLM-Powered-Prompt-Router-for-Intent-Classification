@@ -14,7 +14,7 @@ for clarification instead of attempting to answer.
 
 import os
 
-import google.generativeai as genai
+from openai import OpenAI
 from dotenv import load_dotenv
 
 from prompts import EXPERT_PROMPTS
@@ -23,9 +23,14 @@ from prompts import EXPERT_PROMPTS
 # Configuration
 # ---------------------------------------------------------------------------
 load_dotenv()
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-_GENERATION_MODEL = "gemini-2.0-flash"
+# Initialize the OpenAI client for OpenRouter
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.environ.get("OPENROUTER_API_KEY", "")
+)
+
+_GENERATION_MODEL = "google/gemini-2.0-flash-exp:free"
 
 
 # ---------------------------------------------------------------------------
@@ -52,17 +57,14 @@ def route_and_respond(message: str, intent_obj: dict) -> str:
     # Safety net: if intent is somehow not in our map, fall back to "unclear"
     system_prompt = EXPERT_PROMPTS.get(intent, EXPERT_PROMPTS["unclear"])
 
-    model = genai.GenerativeModel(
-        model_name=_GENERATION_MODEL,
-        system_instruction=system_prompt,
+    completion = client.chat.completions.create(
+        model=_GENERATION_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ],
+        temperature=0.7,
+        max_tokens=1024,
     )
 
-    response = model.generate_content(
-        message,
-        generation_config=genai.GenerationConfig(
-            temperature=0.7,
-            max_output_tokens=1024,
-        ),
-    )
-
-    return response.text.strip()
+    return completion.choices[0].message.content.strip()
