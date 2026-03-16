@@ -11,14 +11,14 @@ A complete, runnable Python application that acts as an intelligent router for u
 - **Automated Tests**: A built-in 15-message test suite `--test` to verify routing behaviours.
 
 ## Important Note
-This project uses **OpenRouter** to access models like `google/gemini-2.0-flash-exp:free`. You must provide a valid `OPENROUTER_API_KEY` to run the application.
+This project uses **OpenRouter** to access models like `google/gemini-2.0-flash-exp:free`. You must provide a valid `OPENAI_API_KEY` to run the application (the OpenAI Python SDK uses this variable by default).
 
 ## Setup Instructions
 
 ### Prerequisites
 - Docker and Docker Compose
 - Or Python 3.11+ (if running locally)
-- An OpenRouter API Key.
+- An OpenRouter API Key (passed as OPENAI_API_KEY).
 
 ### 1. Environment Configuration
 Copy the sample environment file and insert your API key:
@@ -27,7 +27,7 @@ cp .env.example .env
 ```
 Inside `.env`, set:
 ```env
-OPENROUTER_API_KEY=your_actual_openrouter_api_key
+OPENAI_API_KEY=your_actual_openrouter_api_key
 ```
 
 ### 2. Running with Docker Compose
