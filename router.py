@@ -1,15 +1,7 @@
 """
 router.py
 =========
-Provides route_and_respond(message, intent_obj) — the second step in the
-routing pipeline.
-
-The function looks up the appropriate expert system prompt using the intent
-label from the classifier, then makes a second (generation) LLM call to
-produce the final, high-quality response.
-
-Special case: intent == "unclear" → the unclear expert prompt asks the user
-for clarification instead of attempting to answer.
+Provides route_and_respond(message, intent_obj)
 """
 
 import os
@@ -24,47 +16,47 @@ from prompts import EXPERT_PROMPTS
 # ---------------------------------------------------------------------------
 load_dotenv()
 
-# Initialize the OpenAI client for OpenRouter
+api_key = os.environ.get("OPENROUTER_API_KEY")
+
+if not api_key:
+    raise ValueError("❌ OPENROUTER_API_KEY not set in .env")
+
+# OpenRouter client
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.environ.get("OPENROUTER_API_KEY", "")
+    api_key=api_key,
+    default_headers={
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "Prompt Router Project"
+    }
 )
 
-_GENERATION_MODEL = "google/gemini-2.0-flash-exp:free"
+# ✅ FIXED MODEL (WORKING)
+_GENERATION_MODEL = "openai/gpt-3.5-turbo"
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Main Function
 # ---------------------------------------------------------------------------
 
 def route_and_respond(message: str, intent_obj: dict) -> str:
-    """
-    Select the expert system prompt matching *intent_obj["intent"]* and call
-    the generation LLM to produce the final answer.
-
-    Parameters
-    ----------
-    message     : the original user message.
-    intent_obj  : dict returned by classify_intent, e.g.
-                  {"intent": "code", "confidence": 0.92}
-
-    Returns
-    -------
-    str — the generated response text.
-    """
     intent = intent_obj.get("intent", "unclear")
 
-    # Safety net: if intent is somehow not in our map, fall back to "unclear"
     system_prompt = EXPERT_PROMPTS.get(intent, EXPERT_PROMPTS["unclear"])
 
-    completion = client.chat.completions.create(
-        model=_GENERATION_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message}
-        ],
-        temperature=0.7,
-        max_tokens=1024,
-    )
+    try:
+        completion = client.chat.completions.create(
+            model=_GENERATION_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message}
+            ],
+            temperature=0.7,
+            max_tokens=1024,
+        )
 
-    return completion.choices[0].message.content.strip()
+        return completion.choices[0].message.content.strip()
+
+    except Exception as e:
+        print(f"[router] Error: {e}")
+        return "⚠️ Error generating response. Please try again."
